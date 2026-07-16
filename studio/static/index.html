@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RawAccel Studio</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖱️</text></svg>">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-icon">🖱️</span>
+    <span class="brand-name">RawAccel <em>Studio</em></span>
+  </div>
+  <div class="profiles-strip" id="profilesStrip"></div>
+  <div class="topbar-actions">
+    <button id="saveProfileBtn" class="btn ghost" title="Сохранить текущие настройки как профиль">💾 Профиль</button>
+    <button id="applyBtn" class="btn primary">Применить<span id="dirtyDot" class="dirty-dot" hidden></span></button>
+  </div>
+</header>
+
+<main class="layout">
+  <aside class="panel">
+    <section class="card">
+      <h2>Режим ускорения</h2>
+      <div class="mode-grid" id="modeGrid"></div>
+      <p class="mode-hint" id="modeHint"></p>
+      <label class="toggle-row" id="gainRow">
+        <span data-tip="Gain — плавная кривая без резких скачков ускорения. Рекомендуется.">Gain</span>
+        <input type="checkbox" id="gainToggle" checked>
+        <span class="switch"></span>
+      </label>
+    </section>
+
+    <section class="card" id="paramsCard">
+      <h2>Параметры кривой</h2>
+      <div id="paramRows"></div>
+      <div id="lutTools" hidden>
+        <p class="mode-hint">Перетаскивай точки на графике. Двойной клик — добавить точку, правый клик по точке — удалить.</p>
+        <button class="btn ghost small" id="lutFromCurve">Снять точки с текущей кривой</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Общие</h2>
+      <div id="commonRows"></div>
+    </section>
+
+    <section class="card" id="sfCard">
+      <h2>🎯 Sens Finder</h2>
+      <div id="sfBody" class="sf-body">Загрузка…</div>
+      <div class="sf-actions">
+        <button class="btn ghost small" id="sfLaunch">Запустить тест</button>
+        <button class="btn primary small" id="sfSuggest" hidden>✨ Построить кривую</button>
+      </div>
+    </section>
+  </aside>
+
+  <section class="chart-area">
+    <div class="chart-head">
+      <div class="legend" id="legend">
+        <span class="lg"><i class="sw draft"></i>Новая кривая</span>
+        <span class="lg" id="lgApplied" hidden><i class="sw applied"></i>Применённая</span>
+    <span class="lg" title="Подвигай мышкой над этой страницей — точка покажет твою текущую скорость на кривой"><i class="dot-live"></i>Мышь (живой ввод)</span>
+      </div>
+      <div class="range-btns" id="rangeBtns">
+        <button data-max="20">0–20</button>
+        <button data-max="60" class="on">0–60</button>
+        <button data-max="150">0–150</button>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="chart"></canvas>
+      <div class="tooltip" id="tooltip" hidden></div>
+    </div>
+    <div class="chart-foot">
+      <span>По горизонтали — скорость мыши (counts/ms), по вертикали — множитель чувствительности.</span>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

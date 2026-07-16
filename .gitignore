@@ -1,0 +1,7 @@
+__pycache__/
+dist/
+build/_work/
+build/icon.ico
+data/
+*.zip
+shot_*.png
