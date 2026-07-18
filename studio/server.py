@@ -144,6 +144,8 @@ def sensfinder_summary():
         "find": latest.get("find"),
         "find_track": latest.get("find_track"),
         "bench": latest.get("bench"),
+        # curve the tests were run on + their timestamps (idempotent rebuilds)
+        "sfBase": load_state().get("sfBase"),
     }
 
 
@@ -238,6 +240,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, {"ok": True, "profiles": list_profiles()})
             if self.path == "/api/sensfinder/launch":
                 launch_sensfinder()
+                return self._send(200, {"ok": True})
+            if self.path == "/api/sensfinder/base":
+                # {findTs, trackTs, params} -> remember which curve the
+                # current test results were measured on
+                state = load_state()
+                state["sfBase"] = body
+                save_state(state)
                 return self._send(200, {"ok": True})
             if self.path == "/api/radir":
                 # {path} -> validate + remember the RawAccel folder

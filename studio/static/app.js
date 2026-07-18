@@ -824,10 +824,16 @@ function sfSuggestion() {
     if (Math.abs(kf - kt) / Math.max(kf, kt) < 0.05) {
       return { type: "flat", k: (kf + kt) / 2, kf, kt };
     }
-    // transition midpoint from measured input speeds (counts/ms) if logged
+    // transition midpoint from measured input speeds (counts/ms) if logged:
+    // geometric mean of the two p90s — between "still tracking" and "already
+    // flicking". Flick-round median is dominated by slow correction frames,
+    // only p90 sees the ballistic phase, so med must not be used here.
     const fs = sfData.find.speed, ts = sfData.find_track.speed;
-    const vMid = fs && ts ? Math.sqrt(ts.p90 * fs.med) : 8;
-    return { type: "curve", kf, kt, vMid };
+    const ok = fs && ts && ts.p90 > 0 && fs.p90 > ts.p90;
+    const vMid = ok ? Math.sqrt(ts.p90 * fs.p90) : 8;
+    // width so the 25→75% part of the blend spans exactly ts.p90..fs.p90
+    const w = ok ? Math.min(0.9, Math.max(0.35, Math.log(fs.p90 / ts.p90) / (2 * Math.log(3)))) : 0.55;
+    return { type: "curve", kf, kt, vMid, w };
   }
   return { type: "flat", k: kf != null ? kf : kt, kf, kt };
 }
@@ -835,28 +841,44 @@ function sfSuggestion() {
 function sfApplySuggestion() {
   const s = sfSuggestion();
   if (!s || !applied) return;
+  // Idempotent rebuild: the k-ratios are relative to the curve the tests were
+  // RUN on. First press builds from the live applied curve and remembers it
+  // (state.sfBase, keyed by test timestamps); repeat presses with the same
+  // results rebuild from that stored base instead of compounding on top of
+  // the previous build. Newer tests reset the base to the now-applied curve
+  // (they were measured under it).
+  const fts = sfData.find ? sfData.find.ts : null;
+  const tts = sfData.find_track ? sfData.find_track.ts : null;
+  const sb = sfData.sfBase;
+  const same = sb && sb.params && sb.findTs === fts && sb.trackTs === tts;
+  const base = same ? sb.params : JSON.parse(JSON.stringify(applied));
+  if (!same) {
+    sfData.sfBase = { findTs: fts, trackTs: tts, params: base };
+    api("/api/sensfinder/base", sfData.sfBase).catch(() => {});
+  }
   if (s.type === "flat") {
-    cur.sens = +(applied.sens * s.k).toFixed(4);
+    cur.sens = +(base.sens * s.k).toFixed(4);
     renderAll();
     toast(`Множитель сенса → ${cur.sens} (форма кривой не тронута) — смотри график и жми «Применить»`);
     return;
   }
-  // LUT = current applied curve × smooth ramp from kt (tracking speeds)
+  // LUT = base curve × smooth ramp from kt (tracking speeds)
   // to kf (flick speeds); logistic in log-speed space around vMid
-  const w = 0.55; // ln-units ≈ 1.6 octaves of transition width
-  const scale = v => s.kt + (s.kf - s.kt) / (1 + Math.exp(-(Math.log(v) - Math.log(s.vMid)) / w));
+  const scale = v => s.kt + (s.kf - s.kt) / (1 + Math.exp(-(Math.log(v) - Math.log(s.vMid)) / s.w));
   const pts = [];
   const n = 16, x0 = 0.15, x1 = 90;
   for (let i = 0; i < n; i++) {
     const x = x0 * Math.pow(x1 / x0, i / (n - 1));
-    pts.push({ x: +x.toFixed(3), y: +(sensAt(applied, x) * scale(x)).toFixed(4) });
+    pts.push({ x: +x.toFixed(3), y: +(sensAt(base, x) * scale(x)).toFixed(4) });
   }
   cur.mode = "lut";
   cur.gain = false;
   cur.data = pts;
   cur.sens = 1;
   renderAll();
-  toast("Кривая построена: трекинг-оптимум на малых скоростях → флик-оптимум на больших. Подправь точки и жми «Применить»");
+  toast(same
+    ? "Кривая пересобрана заново от исходной базы (без наслоения) — жми «Применить»"
+    : "Кривая построена: трекинг-оптимум на малых скоростях → флик-оптимум на больших. Подправь точки и жми «Применить»");
 }
 
 function renderSensFinder() {
