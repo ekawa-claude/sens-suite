@@ -10,6 +10,7 @@ Wraps the local server (server.py) in a WebView2 window with a tray icon:
 import json
 import sys
 import threading
+import time
 import urllib.request
 
 import server
@@ -145,6 +146,31 @@ def apply_profile_from_tray(name: str):
             tray.notify(f"Ошибка: {e}", APP_NAME)
 
 
+def reapply_active_profile():
+    """The RawAccel driver forgets its settings on reboot — push the active
+    profile back every time Studio starts (retry: writer can lose the race
+    with the driver right after logon)."""
+    name = server.load_state().get("activeProfile")
+    if not name:
+        return
+    p = server.PROFILES_DIR / (name + ".json")
+    if not p.exists():
+        return
+    last = None
+    for attempt in range(3):
+        if attempt:
+            time.sleep(5)
+        try:
+            last = server.apply_to_driver(server.read_json(p))
+            if last["code"] == 0:
+                return
+        except Exception as e:
+            last = {"code": 1, "out": "", "err": str(e)}
+    if tray:
+        tray.notify("Не удалось применить профиль «{}» после запуска: {}".format(
+            name, (last or {}).get("err") or (last or {}).get("out") or "?"), APP_NAME)
+
+
 def build_menu():
     import pystray
     active = server.load_state().get("activeProfile")
@@ -204,6 +230,7 @@ def main():
 
     window.events.closing += on_closing
     start_tray()
+    threading.Thread(target=reapply_active_profile, daemon=True).start()
     try:
         webview.start()
     finally:
